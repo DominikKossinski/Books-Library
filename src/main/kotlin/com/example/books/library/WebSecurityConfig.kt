@@ -50,7 +50,7 @@ class WebSecurityConfig : WebSecurityConfigurerAdapter() {
         http!!.authorizeRequests()
                 .antMatchers("/api/login", "/api/checkName", "/api/checkPassword", "/api/checkEmail",
                         "/api/addUser", "/api/confirmAccount", "/api/getItem", "/api/invitation/**",
-                        "/api/getBooksByPattern**", "/api/getBookById**", "/api/getBookByISBN**").permitAll()
+                        "/api/getBooksByPattern**", "/api/getBookById**", "/api/getBookByISBN**", "/api/getItemsByBookId**").permitAll()
                 .antMatchers("/api/logout").authenticated()
                 .antMatchers("/api/library/{libId}/**").access("@webSecurityConfig.checkLib(authentication, #libId)")
                 .antMatchers("/api/{id}/**").access("@webSecurityConfig.checkId(authentication, #id)")

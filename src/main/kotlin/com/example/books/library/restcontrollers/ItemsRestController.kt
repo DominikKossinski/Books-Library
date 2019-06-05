@@ -20,6 +20,21 @@ class ItemsRestController {
     }
 
     var itemsInterface = object : ItemsInterface {
+        override fun getItemsByBookId(bookId: Long): ArrayList<Item> {
+            val sqlString = "SELECT ITEM_ID, LIBRARY_ID, I.BOOK_ID, BOOK_STATUS, ACT_LIB_ID FROM items i JOIN books b on i.BOOK_ID = b.BOOK_ID WHERE b.BOOK_ID = ?"
+            val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
+            prepStmt.setLong(1, bookId)
+            val items = ArrayList<Item>()
+            val resultSet = prepStmt.executeQuery()
+            while (resultSet.next()) {
+                val item = Item(resultSet.getLong("item_id"), resultSet.getLong("library_id"),
+                        resultSet.getLong("book_id"), resultSet.getString("book_status"),
+                        resultSet.getLong("act_lib_id"), null)
+                items.add(item)
+            }
+            return items
+        }
+
         override fun getItemById(id: Long): Item? {
             val sqlString = "SELECT ITEM_ID, LIBRARY_ID, I.BOOK_ID, BOOK_STATUS, ACT_LIB_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM ITEMS I JOIN BOOKS B ON I.BOOK_ID = B.BOOK_ID WHERE ITEM_ID = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
@@ -90,6 +105,26 @@ class ItemsRestController {
         val itemsArray = gson.toJsonTree(items)
         val response = JsonObject()
         response.addProperty("status", "ok")
+        response.add("items", itemsArray)
+        return ResponseEntity.ok(response.toString())
+    }
+
+    @CrossOrigin(origins = ["http://localhost:3000"], methods = [RequestMethod.GET], allowCredentials = "true",
+            allowedHeaders = ["*"])
+    @RequestMapping(value = ["/api/getItemsByBookId"], method = [RequestMethod.GET],
+            produces = [MediaType.APPLICATION_JSON_UTF8_VALUE])
+    fun getItemsByBookId(@RequestParam("bookId") bookId: Long): ResponseEntity<String> {
+        val book = BooksRestController().booksInterface.getBookById(bookId)
+        val response = JsonObject()
+        if (book == null) {
+            response.addProperty("status", "error")
+            response.addProperty("descriptin", "no book")
+        }
+        val items = itemsInterface.getItemsByBookId(bookId)
+        val itemsArray = gson.toJsonTree(items)
+        val bookObject = gson.toJsonTree(book, Book::class.java)
+        response.addProperty("status", "ok")
+        response.add("book", bookObject)
         response.add("items", itemsArray)
         return ResponseEntity.ok(response.toString())
     }

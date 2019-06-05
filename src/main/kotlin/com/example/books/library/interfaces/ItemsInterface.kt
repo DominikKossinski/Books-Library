@@ -9,4 +9,6 @@ interface ItemsInterface {
     fun getItemByLibrary(libId: Long): ArrayList<Item>
 
     fun addItem(item: Item): Long
+
+    fun getItemsByBookId(bookId: Long): ArrayList<Item>
 }
