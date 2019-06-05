@@ -37,7 +37,7 @@ class LoginRestController {
                 SecurityContextHolder.getContext().authentication = authentication
                 user = UsersRestController().usersInterface.getUserByName(user.name)
                 val userObject = gson.toJsonTree(user, User::class.java)
-                logger.info("User ${user.name} logged")
+                logger.info("User ${user} logged")
                 response.addProperty("status", "ok")
                 response.add("user", userObject)
             } else {

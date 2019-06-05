@@ -160,14 +160,13 @@ class UsersRestController {
             prepStmt.setString(1, name)
             val resultSet = prepStmt.executeQuery()
             var count = 0
-            var user: User? = null
             while (resultSet.next()) {
-                user = User(resultSet.getLong("USER_ID"), resultSet.getString("NAME"),
-                        resultSet.getString("EMAIL"), "", 1, resultSet.getLong("library_id"))
                 count++
             }
             return if (count == 1) {
-                user
+                resultSet.first()
+                User(resultSet.getLong("USER_ID"), resultSet.getString("NAME"),
+                        resultSet.getString("EMAIL"), "", 1, resultSet.getLong("library_id"))
             } else {
                 null
             }
