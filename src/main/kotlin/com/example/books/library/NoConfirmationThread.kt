@@ -21,6 +21,10 @@ class NoConfirmationThread(private val userId: Long) : Thread() {
         if (count == 0) {
             logger.info("User $userId confirmed")
         } else {
+            val libString = "DELETE FROM LIBRARIES WHERE User_ID = ?"
+            val stmt = DBConnection.dbConnection!!.prepareStatement(libString)
+            stmt.setLong(1, id)
+            stmt.executeUpdate()
             logger.warn("USer $userId deleted (count = $count)")
         }
     }

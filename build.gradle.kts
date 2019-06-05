@@ -30,6 +30,7 @@ dependencies {
     implementation("javax.activation:activation:1.1")
     implementation("com.sun.mail:javax.mail:1.5.1")
     implementation("com.sun.mail:smtp:1.6.3")
+    implementation("org.hibernate:hibernate-core:5.0.7.Final")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 

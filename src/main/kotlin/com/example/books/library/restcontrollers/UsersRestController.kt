@@ -31,6 +31,41 @@ class UsersRestController {
     }
 
     var usersInterface = object : UsersInterface {
+        override fun getUserByEmail(email: String): User? {
+            val sqlString = "SELECT USER_ID, NAME, EMAIL, STATUS FROM USERS WHERE EMAIL = ?"
+            val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
+            prepStmt.setString(1, email)
+            val resultSet = prepStmt.executeQuery()
+            var count = 0
+            while (resultSet.next()) {
+                count++
+            }
+            return if (count == 1) {
+                resultSet.first()
+                User(resultSet.getLong("user_id"), resultSet.getString("name"), resultSet.getString("email"), "", resultSet.getInt("status"))
+            } else {
+                null
+            }
+        }
+
+        override fun getUserById(id: Long): User? {
+            val sqlString = "SELECT USER_ID, NAME, EMAIL, STATUS FROM USERS WHERE USER_ID = ?"
+            val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
+            prepStmt.setLong(1, id)
+            val resultSet = prepStmt.executeQuery()
+            var count = 0
+            while (resultSet.next()) {
+                count++
+            }
+            return if (count == 1) {
+                resultSet.first()
+                User(id, resultSet.getString("name"), resultSet.getString("email"), "", resultSet.getInt("status"))
+            } else {
+                null
+            }
+
+        }
+
         override fun getUserPassword(id: Long): String {
             val sqlString = "SELECT PASSWORD FROM users WHERE USER_ID = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
@@ -68,6 +103,7 @@ class UsersRestController {
 
         override fun createUser(user: User): Long {
             val sqlString = "INSERT INTO users(name, email, password, status) values (?, ?, ?, 0)"
+            DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString, Statement.RETURN_GENERATED_KEYS)
             prepStmt.setString(1, user.name)
             prepStmt.setString(2, user.email)
@@ -76,8 +112,20 @@ class UsersRestController {
             if (count == 1) {
                 val set = prepStmt.generatedKeys
                 set.first()
-                return set.getLong(1)
+                val id = set.getLong(1)
+                val libString = "INSERT INTO libraries(USER_ID) VALUES(?)"
+                val stmt = DBConnection.dbConnection!!.prepareStatement(libString)
+                stmt.setLong(1, id)
+                val libs = stmt.executeUpdate()
+                if (libs == 1) {
+                    DBConnection.dbConnection!!.commit()
+                    return id
+                } else {
+                    DBConnection.dbConnection!!.rollback()
+                    return -2
+                }
             }
+            DBConnection.dbConnection!!.rollback()
             return -1
         }
 
@@ -107,7 +155,7 @@ class UsersRestController {
         }
 
         override fun getUserByName(name: String): User? {
-            val sqlString = "SELECT USER_ID, NAME, EMAIL FROM USERS WHERE STATUS = 1 AND NAME =     ?"
+            val sqlString = "SELECT users.USER_ID, NAME, EMAIL, LIBRARY_ID FROM USERS JOIN LIBRARIES ON users.USER_ID = libraries.USER_ID WHERE STATUS = 1 AND NAME = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setString(1, name)
             val resultSet = prepStmt.executeQuery()
@@ -115,7 +163,7 @@ class UsersRestController {
             var user: User? = null
             while (resultSet.next()) {
                 user = User(resultSet.getLong("USER_ID"), resultSet.getString("NAME"),
-                        resultSet.getString("EMAIL"), "", 1)
+                        resultSet.getString("EMAIL"), "", 1, resultSet.getLong("library_id"))
                 count++
             }
             return if (count == 1) {
@@ -156,9 +204,12 @@ class UsersRestController {
                 response.addProperty("status", "ok")
                 val userObject = gson.toJsonTree(user, User::class.java)
                 response.add("user", userObject)
-            } else {
+            } else if (insert == (-1).toLong()) {
                 response.addProperty("status", "error")
                 response.addProperty("description", "check user data")
+            } else {
+                response.addProperty("status", "error")
+                response.addProperty("description", "error by adding lib")
             }
         } else {
             response.addProperty("status", "error")

@@ -18,5 +18,9 @@ interface UsersInterface {
 
     fun getUserPassword(id: Long): String
 
+    fun getUserById(id: Long): User?
+
+    fun getUserByEmail(email: String): User?
+
 
 }

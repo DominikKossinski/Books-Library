@@ -1,5 +1,6 @@
 package com.example.books.library
 
+import com.example.books.library.models.Invitation
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.mail.SimpleMailMessage
 import org.springframework.mail.javamail.JavaMailSender
@@ -20,5 +21,25 @@ class NotificationService @Autowired constructor(javaMailSender: JavaMailSender)
                 "http://localhost:3000/confirmAccount/$userName/$userId")
         javaMailSender!!.send(message)
 
+    }
+
+    fun sendInvitationMessage(invitation: Invitation, name: String) {
+        val message = SimpleMailMessage()
+        message.setTo(invitation.email)
+        message.setFrom(System.getenv("mailUserName"))
+        message.setSubject("Invitation from $name")
+        if (invitation.status.contentEquals("user exists")) {
+            message.setText("Hello \n" +
+                    "User $name send you invitation to library. Click the link below to accept invitation\n" +
+                    "http://localhost:3000/invitation/${invitation.invitationId}")
+        } else {
+            message.setText("Hello \n" +
+                    "User $name send you invitation to library.\n" +
+                    "You need to create account with this email ${invitation.email} on our service:\n" +
+                    "http://localhost:3000/login\n" +
+                    "Then click the link below to accept invitation\n" +
+                    "http://localhost:3000/invitation/${invitation.invitationId} \n")
+        }
+        javaMailSender!!.send(message)
     }
 }

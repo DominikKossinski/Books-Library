@@ -1,5 +1,8 @@
 package com.example.books.library
 
+import com.example.books.library.restcontrollers.LibrariesRestController
+import com.example.books.library.restcontrollers.MembersRestController
+import com.example.books.library.restcontrollers.UsersRestController
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.context.annotation.Bean
@@ -8,6 +11,7 @@ import org.springframework.mail.javamail.JavaMailSenderImpl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter
+import org.springframework.security.core.Authentication
 import org.springframework.security.core.userdetails.User
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.web.cors.CorsConfiguration
@@ -45,8 +49,10 @@ class WebSecurityConfig : WebSecurityConfigurerAdapter() {
     override fun configure(http: HttpSecurity?) {
         http!!.authorizeRequests()
                 .antMatchers("/api/login", "/api/checkName", "/api/checkPassword", "/api/checkEmail",
-                        "/api/addUser", "/api/confirmAccount").permitAll()
+                        "/api/addUser", "/api/confirmAccount", "/api/getItem", "/api/invitation/**").permitAll()
                 .antMatchers("/api/logout").authenticated()
+                .antMatchers("/api/library/{libId}/**").access("@webSecurityConfig.checkLib(authentication, #libId)")
+                .antMatchers("/api/{id}/**").access("@webSecurityConfig.checkId(authentication, #id)")
         http.csrf().disable()
         val corsConfiguration = CorsConfiguration()
         corsConfiguration.allowCredentials = true
@@ -72,5 +78,31 @@ class WebSecurityConfig : WebSecurityConfigurerAdapter() {
         }
         logger.info("Created $count users")
         return userDetailsService
+    }
+
+    fun checkLib(authentication: Authentication, libId: Long): Boolean {
+        logger.info("Requested librery: $libId")
+        val user = UsersRestController().usersInterface.getUserByName(authentication.name) ?: return false
+        val lib = LibrariesRestController().librariesInterface.getLibraryByUserId(user.id)
+        logger.info("Requested library: $libId libId: $lib user: $user")
+        if (lib == libId) {
+            return true
+        } else {
+            //TODO Members rest controler
+            val members = MembersRestController().membersInterface.getMembersByLibId(libId)
+            for (member in members) {
+                if (member.user.id == user.id) {
+                    return true
+                }
+            }
+            return false
+        }
+    }
+
+    fun checkId(authentication: Authentication, id: Long): Boolean {
+        logger.info("Requested id: $id")
+        val user = UsersRestController().usersInterface.getUserByName(authentication.name) ?: return false
+        logger.info("userId: ${user.id}")
+        return user.id == id
     }
 }
