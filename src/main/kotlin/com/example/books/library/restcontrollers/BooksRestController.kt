@@ -21,12 +21,12 @@ class BooksRestController {
 
     val booksInterface = object : BooksInterface {
         override fun getBooksByPatterns(book: Book): ArrayList<Book> {
-            val sqlString = "SELECT BOOK_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM books where TITLE LIKE ? AND AUTHOR LIKE ? AND ISBN LIKE ?"
+            val sqlString = "SELECT BOOK_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM books where LOWER(TITLE) LIKE ? AND LOWER(AUTHOR) LIKE ? AND LOWER(ISBN) LIKE ?"
             DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
-            prepStmt.setString(1, "%${book.title}%")
-            prepStmt.setString(2, "%${book.author}%")
-            prepStmt.setString(3, "%${book.isbn}%")
+            prepStmt.setString(1, "%${book.title.toLowerCase()}%")
+            prepStmt.setString(2, "%${book.author.toLowerCase()}%")
+            prepStmt.setString(3, "%${book.isbn.toLowerCase()}%")
             val resultSet = prepStmt.executeQuery()
             val books = ArrayList<Book>()
             while (resultSet.next()) {
@@ -40,11 +40,11 @@ class BooksRestController {
         }
 
         override fun getBooksByPattern(pattern: String): ArrayList<Book> {
-            val sqlString = "SELECT BOOK_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM books where TITLE LIKE ? OR AUTHOR LIKE ? OR ISBN LIKE ?"
+            val sqlString = "SELECT BOOK_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM books where LOWER(TITLE) LIKE ? OR LOWER(AUTHOR) LIKE ? OR LOWER(ISBN) LIKE ?"
             DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             for (i in 1..3) {
-                prepStmt.setString(i, "%$pattern%")
+                prepStmt.setString(i, "%${pattern.toLowerCase()}%")
             }
             val resultSet = prepStmt.executeQuery()
             val books = ArrayList<Book>()
@@ -108,7 +108,7 @@ class BooksRestController {
             prepStmt.setString(2, book.isbn)
             prepStmt.setString(3, book.author)
             prepStmt.setInt(4, book.pagesCount)
-            var count = prepStmt.executeUpdate()
+            val count = prepStmt.executeUpdate()
             return if (count == 1) {
                 val keys = prepStmt.generatedKeys
                 keys.first()
