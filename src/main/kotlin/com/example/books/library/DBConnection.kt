@@ -18,6 +18,7 @@ class DBConnection {
             dataSource.username = System.getenv("dbUserName")
             dataSource.password = System.getenv("dbPassword")
             dbConnection = dataSource.connection
+            dbConnection!!.autoCommit = false
         }
 
 

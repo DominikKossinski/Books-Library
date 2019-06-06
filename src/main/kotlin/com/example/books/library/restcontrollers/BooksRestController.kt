@@ -20,8 +20,28 @@ class BooksRestController {
     }
 
     val booksInterface = object : BooksInterface {
+        override fun getBooksByPatterns(book: Book): ArrayList<Book> {
+            val sqlString = "SELECT BOOK_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM books where TITLE LIKE ? AND AUTHOR LIKE ? AND ISBN LIKE ?"
+            DBConnection.dbConnection!!.beginRequest()
+            val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
+            prepStmt.setString(1, "%${book.title}%")
+            prepStmt.setString(2, "%${book.author}%")
+            prepStmt.setString(3, "%${book.isbn}%")
+            val resultSet = prepStmt.executeQuery()
+            val books = ArrayList<Book>()
+            while (resultSet.next()) {
+                val bookFromSet = Book(resultSet.getLong("book_id"), resultSet.getString("title"),
+                        resultSet.getString("author"), resultSet.getString("isbn"),
+                        resultSet.getInt("pages_count"))
+                books.add(bookFromSet)
+            }
+            DBConnection.dbConnection!!.commit()
+            return books
+        }
+
         override fun getBooksByPattern(pattern: String): ArrayList<Book> {
             val sqlString = "SELECT BOOK_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM books where TITLE LIKE ? OR AUTHOR LIKE ? OR ISBN LIKE ?"
+            DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             for (i in 1..3) {
                 prepStmt.setString(i, "%$pattern%")
@@ -34,11 +54,13 @@ class BooksRestController {
                         resultSet.getInt("pages_count"))
                 books.add(book)
             }
+            DBConnection.dbConnection!!.commit()
             return books
         }
 
         override fun getBookById(id: Long): Book? {
             val sqlString = "SELECT BOOK_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM books where BOOK_ID = ?"
+            DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, id)
             val resultSet = prepStmt.executeQuery()
@@ -46,6 +68,7 @@ class BooksRestController {
             while (resultSet.next()) {
                 count++
             }
+            DBConnection.dbConnection!!.commit()
             return if (count == 1) {
                 resultSet.first()
                 Book(resultSet.getLong("book_id"), resultSet.getString("title"),
@@ -58,6 +81,7 @@ class BooksRestController {
 
         override fun getBookByISBN(isbn: String): Book? {
             val sqlString = "SELECT BOOK_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM books where ISBN = ?"
+            DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setString(1, isbn)
             val resultSet = prepStmt.executeQuery()
@@ -65,6 +89,7 @@ class BooksRestController {
             while (resultSet.next()) {
                 count++
             }
+            DBConnection.dbConnection!!.commit()
             return if (count == 1) {
                 resultSet.first()
                 Book(resultSet.getLong("book_id"), resultSet.getString("title"),
@@ -77,6 +102,7 @@ class BooksRestController {
 
         override fun addBook(book: Book): Long {
             val sqlString = "INSERT INTO books(TITLE, ISBN, AUTHOR, PAGES_COUNT) VALUES (?, ?, ?, ?)"
+            DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString, Statement.RETURN_GENERATED_KEYS)
             prepStmt.setString(1, book.title)
             prepStmt.setString(2, book.isbn)
@@ -86,8 +112,10 @@ class BooksRestController {
             return if (count == 1) {
                 val keys = prepStmt.generatedKeys
                 keys.first()
+                DBConnection.dbConnection!!.commit()
                 return keys.getLong(1)
             } else {
+                DBConnection.dbConnection!!.rollback()
                 -1
             }
         }
@@ -100,6 +128,20 @@ class BooksRestController {
             produces = [MediaType.APPLICATION_JSON_UTF8_VALUE])
     fun getBooksByPattern(@RequestParam("pattern") pattern: String): ResponseEntity<String> {
         val books = booksInterface.getBooksByPattern(pattern)
+        val booksArray = gson.toJsonTree(books).asJsonArray
+        val response = JsonObject()
+        response.addProperty("status", "ok")
+        response.add("books", booksArray)
+        return ResponseEntity.ok(response.toString())
+    }
+
+    @CrossOrigin(origins = ["http://localhost:3000"], methods = [RequestMethod.POST], allowCredentials = "true",
+            allowedHeaders = ["*"])
+    @RequestMapping(value = ["/api/getBooksByPatterns"], method = [RequestMethod.POST],
+            produces = [MediaType.APPLICATION_JSON_UTF8_VALUE])
+    fun getBooksByPatterns(@RequestBody bookData: String): ResponseEntity<String> {
+        val book = gson.fromJson(bookData, Book::class.java)
+        val books = booksInterface.getBooksByPatterns(book)
         val booksArray = gson.toJsonTree(books).asJsonArray
         val response = JsonObject()
         response.addProperty("status", "ok")

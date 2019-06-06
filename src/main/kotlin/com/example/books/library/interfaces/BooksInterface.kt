@@ -6,6 +6,8 @@ interface BooksInterface {
 
     fun getBooksByPattern(pattern: String): ArrayList<Book>
 
+    fun getBooksByPatterns(book: Book): ArrayList<Book>
+
     fun getBookById(id: Long): Book?
 
     fun getBookByISBN(isbn: String): Book?
