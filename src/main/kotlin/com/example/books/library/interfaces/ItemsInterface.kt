@@ -11,4 +11,6 @@ interface ItemsInterface {
     fun addItem(item: Item): Long
 
     fun getItemsByBookId(bookId: Long): ArrayList<Item>
+
+    fun existsItem(item: Item): Boolean
 }

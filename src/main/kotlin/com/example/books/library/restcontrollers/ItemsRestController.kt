@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import java.sql.Statement
 
 @RestController
 class ItemsRestController {
@@ -20,8 +21,24 @@ class ItemsRestController {
     }
 
     var itemsInterface = object : ItemsInterface {
+        override fun existsItem(item: Item): Boolean {
+            val sqlString = "SELECT ITEM_ID FROM items WHERE BOOK_ID = ? AND LIBRARY_ID = ?"
+            DBConnection.dbConnection!!.beginRequest()
+            val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
+            prepStmt.setLong(1, item.bookId)
+            prepStmt.setLong(2, item.libraryId)
+            val resultSet = prepStmt.executeQuery()
+            var count = 0
+            while (resultSet.next()) {
+                count++
+            }
+            DBConnection.dbConnection!!.commit()
+            return count > 0
+        }
+
         override fun getItemsByBookId(bookId: Long): ArrayList<Item> {
             val sqlString = "SELECT ITEM_ID, LIBRARY_ID, I.BOOK_ID, BOOK_STATUS, ACT_LIB_ID FROM items i JOIN books b on i.BOOK_ID = b.BOOK_ID WHERE b.BOOK_ID = ?"
+            DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, bookId)
             val items = ArrayList<Item>()
@@ -32,28 +49,33 @@ class ItemsRestController {
                         resultSet.getLong("act_lib_id"), null)
                 items.add(item)
             }
+            DBConnection.dbConnection!!.commit()
             return items
         }
 
         override fun getItemById(id: Long): Item? {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "SELECT ITEM_ID, LIBRARY_ID, I.BOOK_ID, BOOK_STATUS, ACT_LIB_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM ITEMS I JOIN BOOKS B ON I.BOOK_ID = B.BOOK_ID WHERE ITEM_ID = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, id)
             val resultSet = prepStmt.executeQuery()
             resultSet.next()
-            if (resultSet.isFirst) {
+            return if (resultSet.isFirst) {
                 resultSet.first()
+                DBConnection.dbConnection!!.commit()
                 val book = Book(resultSet.getLong("book_id"), resultSet.getString("title"),
                         resultSet.getString("author"), resultSet.getString("isbn"), resultSet.getInt("pages_count"))
-                return Item(resultSet.getLong("item_id"), resultSet.getLong("library_id"),
+                Item(resultSet.getLong("item_id"), resultSet.getLong("library_id"),
                         resultSet.getLong("book_id"), resultSet.getString("book_status"),
                         resultSet.getLong("act_lib_id"), book)
             } else {
-                return null
+                DBConnection.dbConnection!!.commit()
+                null
             }
         }
 
         override fun getItemByLibrary(libId: Long): ArrayList<Item> {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "SELECT ITEM_ID, LIBRARY_ID, I.BOOK_ID, BOOK_STATUS, ACT_LIB_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM ITEMS I JOIN BOOKS B ON I.BOOK_ID = B.BOOK_ID WHERE (LIBRARY_ID = ? and ACT_LIB_ID IS NULL) OR ACT_LIB_ID = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, libId)
@@ -68,11 +90,27 @@ class ItemsRestController {
                         resultSet.getLong("act_lib_id"), book)
                 items.add(item)
             }
+            DBConnection.dbConnection!!.commit()
             return items
         }
 
         override fun addItem(item: Item): Long {
-            TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+            val sqlString = "INSERT INTO items(LIBRARY_ID, BOOK_ID, BOOK_STATUS, ACT_LIB_ID) VALUES (?, ?, '', NULL)"
+            DBConnection.dbConnection!!.beginRequest()
+            val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString, Statement.RETURN_GENERATED_KEYS)
+            prepStmt.setLong(1, item.libraryId)
+            prepStmt.setLong(2, item.bookId)
+            val count = prepStmt.executeUpdate()
+            return if (count == 1) {
+                val keys = prepStmt.generatedKeys
+                keys.first()
+                DBConnection.dbConnection!!.commit()
+                keys.getLong(1)
+            } else {
+                DBConnection.dbConnection!!.rollback()
+                -10
+            }
+
         }
 
     }
@@ -129,4 +167,33 @@ class ItemsRestController {
         return ResponseEntity.ok(response.toString())
     }
 
+    @CrossOrigin(origins = ["http://localhost:3000"], methods = [RequestMethod.POST], allowCredentials = "true",
+            allowedHeaders = ["*"])
+    @RequestMapping(value = ["/api/library/{libId}/addItem"], method = [RequestMethod.POST],
+            produces = [MediaType.APPLICATION_JSON_UTF8_VALUE])
+    fun addItem(@RequestBody itemData: String, @PathVariable("libId") libId: Long): ResponseEntity<String> {
+        val requestObject = gson.fromJson(itemData, JsonObject::class.java)
+        val book = BooksRestController().booksInterface.getBookByISBN(requestObject.get("isbn").asString)
+        val response = JsonObject()
+        if (book == null) {
+            response.addProperty("status", "error")
+            response.addProperty("description", "no book")
+            return ResponseEntity.ok(response.toString())
+        }
+        val item = Item(0, libId, book.bookId, "", null, book)
+        val exists = itemsInterface.existsItem(item)
+        if (exists) {
+            response.addProperty("status", "error")
+            response.addProperty("description", "item exists")
+        } else {
+            val status = itemsInterface.addItem(item)
+            if (status > 0) {
+                response.addProperty("status", "ok")
+            } else {
+                response.addProperty("status", "error")
+                response.addProperty("description", "error by adding item")
+            }
+        }
+        return ResponseEntity.ok(response.toString())
+    }
 }
