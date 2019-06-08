@@ -2,7 +2,6 @@ package com.example.books.library.restcontrollers
 
 import com.example.books.library.DBConnection
 import com.example.books.library.models.User
-import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -15,8 +14,8 @@ import org.springframework.web.bind.annotation.*
 class LoginRestController {
 
     companion object {
-        val logger = LoggerFactory.getLogger(LoginRestController::class.java)
-        val gson = GsonBuilder().setDateFormat(DBConnection.dateFormat).create()
+        val logger = LoggerFactory.getLogger(LoginRestController::class.java)!!
+        val gson = DBConnection.gson
     }
 
 

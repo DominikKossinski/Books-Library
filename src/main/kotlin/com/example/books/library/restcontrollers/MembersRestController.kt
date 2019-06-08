@@ -4,7 +4,6 @@ import com.example.books.library.DBConnection
 import com.example.books.library.interfaces.MembersInterface
 import com.example.books.library.models.Member
 import com.example.books.library.models.User
-import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -15,12 +14,13 @@ import org.springframework.web.bind.annotation.*
 class MembersRestController {
 
     companion object {
-        val logger = LoggerFactory.getLogger(MembersRestController::class.java)
-        val gson = GsonBuilder().setDateFormat(DBConnection.dateFormat).create()
+        val logger = LoggerFactory.getLogger(MembersRestController::class.java)!!
+        val gson = DBConnection.gson
     }
 
     var membersInterface = object : MembersInterface {
         override fun getMembersByLibId(libId: Long): ArrayList<Member> {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "SELECT M.USER_ID, LIBRARY_ID, NAME, EMAIL FROM MEMBERS M JOIN USERS U ON M.USER_ID = U.USER_ID WHERE LIBRARY_ID = ? AND STATUS = 1"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, libId)
@@ -31,15 +31,18 @@ class MembersRestController {
                 val member = Member(resultSet.getLong("library_id"), user)
                 members.add(member)
             }
+            DBConnection.dbConnection!!.commit()
             return members
         }
 
         override fun addMember(member: Member): Long {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "INSERT INTO MEMBERS(LIBRARY_ID, USER_ID) VALUES (?, ?)"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, member.libId)
             prepStmt.setLong(2, member.user.id)
             val count = prepStmt.executeUpdate()
+            DBConnection.dbConnection!!.commit()
             return count.toLong()
         }
     }

@@ -5,7 +5,6 @@ import com.example.books.library.NotificationService
 import com.example.books.library.interfaces.InvitationsInterface
 import com.example.books.library.models.Invitation
 import com.example.books.library.models.Member
-import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,25 +17,27 @@ import java.sql.Statement
 @RestController
 class InvitationsRestController {
 
-
     @Autowired
     private var notificationService: NotificationService? = null
 
     companion object {
         val logger = LoggerFactory.getLogger(InvitationsRestController::class.java)
-        val gson = GsonBuilder().setDateFormat(DBConnection.dateFormat).create()
+        val gson = DBConnection.gson
     }
 
     val invitationsInterface = object : InvitationsInterface {
         override fun updateStatus(invitationId: Long, status: String) {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "UPDATE invitations SET STATUS = ? WHERE INVITATION_ID = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setString(1, status)
             prepStmt.setLong(2, invitationId)
             prepStmt.executeUpdate()
+            DBConnection.dbConnection!!.commit()
         }
 
         override fun getInvitationById(invitationId: Long): Invitation? {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "SELECT INVITATION_ID, USER_ID, EMAIL, STATUS FROM invitations where INVITATION_ID = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, invitationId)
@@ -46,15 +47,18 @@ class InvitationsRestController {
                 count++
             }
             return if (count == 1) {
+                DBConnection.dbConnection!!.commit()
                 resultSet.first()
                 Invitation(resultSet.getLong("invitation_id"), resultSet.getLong("user_id"),
                         resultSet.getString("email"), resultSet.getString("status"))
             } else {
+                DBConnection.dbConnection!!.rollback()
                 null
             }
         }
 
         override fun getStatus(userId: Long, email: String): String {
+            DBConnection.dbConnection!!.beginRequest()
             val inviteString = "SELECT USER_ID FROM INVITATIONS WHERE EMAIL = ? AND USER_ID = ?"
             val stmt = DBConnection.dbConnection!!.prepareStatement(inviteString)
             stmt.setString(1, email)
@@ -65,6 +69,7 @@ class InvitationsRestController {
                 count++
             }
             if (count > 0) {
+                DBConnection.dbConnection!!.rollback()
                 return "already invited"
             }
             val sqlString = "SELECT USER_ID FROM USERS WHERE EMAIL = ?"
@@ -76,13 +81,16 @@ class InvitationsRestController {
                 count++
             }
             return if (count == 1) {
+                DBConnection.dbConnection!!.commit()
                 "user exists"
             } else {
+                DBConnection.dbConnection!!.rollback()
                 "no user"
             }
         }
 
         override fun addInvitation(invitation: Invitation): Long {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "INSERT INTO invitations(USER_ID, EMAIL, STATUS) VALUES (?, ?, ?)"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString, Statement.RETURN_GENERATED_KEYS)
             prepStmt.setLong(1, invitation.userId)
@@ -92,8 +100,10 @@ class InvitationsRestController {
             return if (count == 1) {
                 val set = prepStmt.generatedKeys
                 set.first()
+                DBConnection.dbConnection!!.commit()
                 set.getLong(1)
             } else {
+                DBConnection.dbConnection!!.rollback()
                 -1
             }
         }

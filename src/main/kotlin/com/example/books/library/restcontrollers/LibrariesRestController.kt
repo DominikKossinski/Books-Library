@@ -4,7 +4,6 @@ import com.example.books.library.DBConnection
 import com.example.books.library.interfaces.LibrariesInterface
 import com.example.books.library.models.Library
 import com.example.books.library.models.User
-import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -15,12 +14,13 @@ import org.springframework.web.bind.annotation.*
 class LibrariesRestController {
 
     companion object {
-        val logger = LoggerFactory.getLogger(LibrariesRestController::class.java)
-        val gson = GsonBuilder().setDateFormat(DBConnection.dateFormat).create()!!
+        val logger = LoggerFactory.getLogger(LibrariesRestController::class.java)!!
+        val gson = DBConnection.gson
     }
 
     val librariesInterface = object : LibrariesInterface {
         override fun getUsersLibrariesByUserId(userId: Long): ArrayList<User> {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "SELECT l.USER_ID, NAME, EMAIL, l.LIBRARY_ID FROM users u JOIN libraries l on u.USER_ID = l.USER_ID JOIN members m on l.LIBRARY_ID = m.LIBRARY_ID where m.USER_ID = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, userId)
@@ -31,15 +31,18 @@ class LibrariesRestController {
                         resultSet.getString("email"), "", 1, resultSet.getLong("library_id"))
                 users.add(user)
             }
+            DBConnection.dbConnection!!.commit()
             return users
         }
 
         override fun getLibraryByUserId(id: Long): Long {
+            DBConnection.dbConnection!!.beginRequest()
             val sqlString = "SELECT LIBRARY_ID FROM LIBRARIES WHERE USER_ID = ?"
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, id)
             val resultSet = prepStmt.executeQuery()
             resultSet.first()
+            DBConnection.dbConnection!!.commit()
             return resultSet.getLong("library_id")
         }
 

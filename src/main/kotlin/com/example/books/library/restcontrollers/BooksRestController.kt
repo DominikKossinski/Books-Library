@@ -16,6 +16,8 @@ class BooksRestController {
     companion object {
         val logger = LoggerFactory.getLogger(BooksRestController::class.java)
         val gson = DBConnection.gson
+        val titleRegex = "^[0-9a-zA-Z ,.]{1,50}$".toRegex()
+        val isbnRegex = "^[0-9]{13}$".toRegex()
     }
 
     val booksInterface = object : BooksInterface {
@@ -186,5 +188,37 @@ class BooksRestController {
         return ResponseEntity.ok(response.toString())
     }
 
+
+    @CrossOrigin(origins = ["http://localhost:3000"], methods = [RequestMethod.POST], allowCredentials = "true",
+            allowedHeaders = ["*"])
+    @RequestMapping(value = ["/api/addBook"], method = [RequestMethod.POST],
+            produces = [MediaType.APPLICATION_JSON_UTF8_VALUE])
+    fun addBook(@RequestBody bookData: String): ResponseEntity<String> {
+        val book = gson.fromJson(bookData, Book::class.java)
+        logger.info("Adding book: $book")
+        val response = JsonObject()
+        if (titleRegex.matches(book.title) && titleRegex.matches(book.author) && isbnRegex.matches(book.isbn) && book.pagesCount > 0) {
+            val searchedBook = booksInterface.getBookByISBN(book.isbn)
+            if (searchedBook == null) {
+                val status = booksInterface.addBook(book)
+                if (status > 0) {
+                    response.addProperty("status", "ok")
+                } else {
+                    response.addProperty("status", "error")
+                    response.addProperty("description", "error by adding book")
+                }
+            } else {
+                response.addProperty("status", "error")
+                response.addProperty("description", "book exists")
+            }
+        } else {
+            response.addProperty("status", "error")
+            response.addProperty("description", "invalid book data")
+            response.addProperty("title", titleRegex.matches(book.title))
+            response.addProperty("author", titleRegex.matches(book.author))
+            response.addProperty("isbn", isbnRegex.matches(book.isbn))
+        }
+        return ResponseEntity.ok(response.toString())
+    }
 
 }

@@ -4,6 +4,7 @@ import com.example.books.library.DBConnection
 import com.example.books.library.interfaces.ItemsInterface
 import com.example.books.library.models.Book
 import com.example.books.library.models.Item
+import com.example.books.library.models.User
 import com.google.gson.JsonObject
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -20,6 +21,49 @@ class ItemsRestController {
     }
 
     var itemsInterface = object : ItemsInterface {
+        override fun searchItemsByPattern(libId: Long, pattern: String): ArrayList<Item> {
+            DBConnection.dbConnection!!.beginRequest()
+            val sqlString = "SELECT ITEM_ID, LIBRARY_ID, COMMENT, START_DATE, END_DATE, I.BOOK_ID, BOOK_STATUS, ACT_LIB_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM ITEMS I JOIN BOOKS B ON I.BOOK_ID = B.BOOK_ID WHERE ((LIBRARY_ID = ? AND ACT_LIB_ID IS NULL) OR ACT_LIB_ID = ?) AND (TITLE LIKE ? OR AUTHOR LIKE ?)"
+            val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
+            prepStmt.setLong(1, libId)
+            prepStmt.setLong(2, libId)
+            prepStmt.setString(3, "%$pattern%")
+            prepStmt.setString(4, "%$pattern%")
+            val resultSet = prepStmt.executeQuery()
+            val items = ArrayList<Item>()
+            while (resultSet.next()) {
+                val book = Book(resultSet.getLong("book_id"), resultSet.getString("title"),
+                        resultSet.getString("author"), resultSet.getString("isbn"), resultSet.getInt("pages_count"))
+                val item = Item(resultSet.getLong("item_id"), resultSet.getLong("library_id"),
+                        resultSet.getLong("book_id"), resultSet.getString("book_status"),
+                        resultSet.getLong("act_lib_id"), resultSet.getString("comment"),
+                        resultSet.getDate("start_date"), resultSet.getDate("end_date"), book)
+                items.add(item)
+            }
+            DBConnection.dbConnection!!.commit()
+            return items
+        }
+
+        override fun getBorrowedItems(libId: Long): ArrayList<Item> {
+            DBConnection.dbConnection!!.beginRequest()
+            val sqlString = "SELECT ITEM_ID, LIBRARY_ID, COMMENT, START_DATE, END_DATE, I.BOOK_ID, BOOK_STATUS, ACT_LIB_ID, TITLE, ISBN, AUTHOR, PAGES_COUNT FROM ITEMS I JOIN BOOKS B ON I.BOOK_ID = B.BOOK_ID WHERE LIBRARY_ID = ? and ACT_LIB_ID IS NOT NULL"
+            val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
+            prepStmt.setLong(1, libId)
+            val resultSet = prepStmt.executeQuery()
+            val items = ArrayList<Item>()
+            while (resultSet.next()) {
+                val book = Book(resultSet.getLong("book_id"), resultSet.getString("title"),
+                        resultSet.getString("author"), resultSet.getString("isbn"), resultSet.getInt("pages_count"))
+                val item = Item(resultSet.getLong("item_id"), resultSet.getLong("library_id"),
+                        resultSet.getLong("book_id"), resultSet.getString("book_status"),
+                        resultSet.getLong("act_lib_id"), resultSet.getString("comment"),
+                        resultSet.getDate("start_date"), resultSet.getDate("end_date"), book)
+                items.add(item)
+            }
+            DBConnection.dbConnection!!.commit()
+            return items
+        }
+
         override fun endReading(item: Item): Boolean {
             val sqlString = "UPDATE ITEMS SET END_DATE = CURDATE() WHERE ITEM_ID = ?"
             DBConnection.dbConnection!!.beginRequest()
@@ -36,7 +80,7 @@ class ItemsRestController {
         }
 
         override fun startReading(item: Item): Boolean {
-            val sqlString = "UPDATE ITEMS SET START_DATE = CURDATE() WHERE ITEM_ID = ?"
+            val sqlString = "UPDATE ITEMS SET START_DATE = CURDATE(), END_DATE = NULL WHERE ITEM_ID = ?"
             DBConnection.dbConnection!!.beginRequest()
             val prepStmt = DBConnection.dbConnection!!.prepareStatement(sqlString)
             prepStmt.setLong(1, item.itemId)
@@ -189,10 +233,26 @@ class ItemsRestController {
             produces = [MediaType.APPLICATION_JSON_UTF8_VALUE])
     fun getItemsByLibrary(@PathVariable("libId") libId: Long): ResponseEntity<String> {
         val items = itemsInterface.getItemByLibrary(libId)
+        val user = UsersRestController().usersInterface.getUserByLibId(libId)
+        val userObject = gson.toJsonTree(user, User::class.java)
         for (item in items) {
             val loans = LoansRestController().loansInterface.getItemHistory(item.itemId)
             item.loans = loans
         }
+        val itemsArray = gson.toJsonTree(items)
+        val response = JsonObject()
+        response.addProperty("status", "ok")
+        response.add("items", itemsArray)
+        response.add("owner", userObject)
+        return ResponseEntity.ok(response.toString())
+    }
+
+    @CrossOrigin(origins = ["http://localhost:3000"], methods = [RequestMethod.GET], allowCredentials = "true",
+            allowedHeaders = ["*"])
+    @RequestMapping(value = ["/api/library/{libId}/getBorrowedItems"], method = [RequestMethod.GET],
+            produces = [MediaType.APPLICATION_JSON_UTF8_VALUE])
+    fun getBorrowed(@PathVariable("libId") libId: Long): ResponseEntity<String> {
+        val items = itemsInterface.getBorrowedItems(libId)
         val itemsArray = gson.toJsonTree(items)
         val response = JsonObject()
         response.addProperty("status", "ok")
@@ -250,6 +310,22 @@ class ItemsRestController {
         return ResponseEntity.ok(response.toString())
     }
 
+    @CrossOrigin(origins = ["http://localhost:3000"], methods = [RequestMethod.GET], allowCredentials = "true",
+            allowedHeaders = ["*"])
+    @RequestMapping(value = ["/api/library/{libId}/search"], method = [RequestMethod.GET],
+            produces = [MediaType.APPLICATION_JSON_UTF8_VALUE])
+    fun searchItemsByLibrary(@PathVariable("libId") libId: Long, @RequestParam("pattern") pattern: String): ResponseEntity<String> {
+        val items = itemsInterface.searchItemsByPattern(libId, pattern)
+        val response = JsonObject()
+        for (item in items) {
+            item.loans = LoansRestController().loansInterface.getItemHistory(item.itemId)
+        }
+        val itemsArray = gson.toJsonTree(items).asJsonArray
+        response.addProperty("status", "ok")
+        response.add("items", itemsArray)
+        return ResponseEntity.ok(response.toString())
+    }
+
     @CrossOrigin(origins = ["http://localhost:3000"], methods = [RequestMethod.POST], allowCredentials = "true",
             allowedHeaders = ["*"])
     @RequestMapping(value = ["/api/{userId}/addComment"], method = [RequestMethod.POST],
@@ -294,7 +370,7 @@ class ItemsRestController {
             response.addProperty("description", "no item")
         } else {
             if (foundItem.libraryId == libId) {
-                val status = if (foundItem.startDate != null) {
+                val status = if (foundItem.endDate == null) {
                     itemsInterface.endReading(foundItem)
                 } else {
                     itemsInterface.startReading(foundItem)
@@ -312,5 +388,6 @@ class ItemsRestController {
         }
         return ResponseEntity.ok(response.toString())
     }
+
 
 }

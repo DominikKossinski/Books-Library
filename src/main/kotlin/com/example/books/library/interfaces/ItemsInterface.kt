@@ -19,4 +19,9 @@ interface ItemsInterface {
     fun endReading(item: Item): Boolean
 
     fun startReading(item: Item): Boolean
+
+    fun getBorrowedItems(libId: Long): ArrayList<Item>
+
+    fun searchItemsByPattern(libId: Long, pattern: String): ArrayList<Item>
+
 }

@@ -1,5 +1,6 @@
 package com.example.books.library.interfaces
 
+import com.example.books.library.models.Item
 import com.example.books.library.models.User
 
 interface UsersInterface {
@@ -21,6 +22,15 @@ interface UsersInterface {
     fun getUserById(id: Long): User?
 
     fun getUserByEmail(email: String): User?
+
+    fun getAvg(id: Long): Float
+
+    fun getLastBook(id: Long): Item?
+
+    fun getReadingBooks(id: Long): ArrayList<Item>
+
+    fun getAvgBooks(id: Long): Float
+    fun getUserByLibId(libId: Long): User?
 
 
 }

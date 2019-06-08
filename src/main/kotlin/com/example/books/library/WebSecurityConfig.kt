@@ -51,7 +51,7 @@ class WebSecurityConfig : WebSecurityConfigurerAdapter() {
                 .antMatchers("/api/login", "/api/checkName", "/api/checkPassword", "/api/checkEmail",
                         "/api/addUser", "/api/confirmAccount", "/api/getItem", "/api/invitation/**",
                         "/api/getBooksByPattern**", "/api/getBookById**", "/api/getBookByISBN**", "/api/getItemsByBookId**",
-                        "/api/lendItem**", "/api/endLending**", "/api/getBooksByPatterns").permitAll()
+                        "/api/lendItem**", "/api/endLending**", "/api/getBooksByPatterns", "/api/addBook").permitAll()
                 .antMatchers("/api/logout").authenticated()
                 .antMatchers("/api/library/{libId}/**").access("@webSecurityConfig.checkLib(authentication, #libId)")
                 .antMatchers("/api/{id}/**").access("@webSecurityConfig.checkId(authentication, #id)")
@@ -90,7 +90,6 @@ class WebSecurityConfig : WebSecurityConfigurerAdapter() {
         if (lib == libId) {
             return true
         } else {
-            //TODO Members rest controler
             val members = MembersRestController().membersInterface.getMembersByLibId(libId)
             for (member in members) {
                 if (member.user.id == user.id) {
